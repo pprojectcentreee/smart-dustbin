@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#10152c" />
+  <title>Smart Dustbin | EMQX Cloud Control</title>
+  <style>
+    :root{
+      color-scheme:light;
+      --ink:#18203b; --sub:#626c86; --faint:#8792aa;
+      --page:#e8effd; --surface:rgba(255,255,255,.67); --surface-strong:rgba(255,255,255,.86);
+      --stroke:rgba(255,255,255,.86); --border:rgba(91,113,175,.15);
+      --shadow:0 18px 45px rgba(52,67,117,.12),inset 0 1px rgba(255,255,255,.7);
+      --accent:#6758ef; --accent2:#3f94f1; --track:rgba(91,105,154,.12);
+      --positive:#149e76; --negative:#e04d63; --warning:#d88b2e;
+    }
+    html[data-theme="dark"]{
+      color-scheme:dark;
+      --ink:#f4f6ff; --sub:#b7c0d7; --faint:#91a0bd;
+      --page:#0e152a; --surface:rgba(23,34,65,.63); --surface-strong:rgba(27,39,72,.87);
+      --stroke:rgba(165,184,243,.14); --border:rgba(163,185,239,.14);
+      --shadow:0 18px 55px rgba(0,0,0,.22),inset 0 1px rgba(215,226,255,.06);
+      --accent:#9b92ff; --accent2:#77b2ff; --track:rgba(166,189,245,.12);
+      --positive:#54ddb4; --negative:#ff7c8b; --warning:#ffd180;
+    }
+    *{box-sizing:border-box}
+    html{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+    body{min-height:100vh;margin:0;color:var(--ink);background:var(--page);transition:background .35s,color .35s}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background:
+      radial-gradient(ellipse 46% 50% at 10% 5%,rgba(111,130,249,.24),transparent 80%),
+      radial-gradient(ellipse 35% 48% at 94% 16%,rgba(72,193,221,.17),transparent 77%),
+      radial-gradient(ellipse 40% 50% at 67% 96%,rgba(189,119,225,.18),transparent 80%)}
+    button{font:inherit;cursor:pointer}
+    .wrap{max-width:1160px;margin:0 auto;padding:26px 24px 38px}
+    .glass{background:var(--surface);border:1px solid var(--stroke);box-shadow:var(--shadow);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border-radius:26px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 25px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{display:grid;place-items:center;width:47px;height:47px;border-radius:16px;color:white;background:linear-gradient(135deg,#6a56f4,#3f9cec);box-shadow:0 9px 24px rgba(88,90,220,.25)}
+    .brand strong{font-size:18px;letter-spacing:-.55px;display:block}
+    .brand small{font-size:11px;color:var(--sub);font-weight:700;letter-spacing:2px;text-transform:uppercase}
+    .right-header{display:flex;align-items:center;gap:10px}
+    .badge{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--border);border-radius:999px;padding:11px 15px;background:var(--surface-strong);font-size:12px;font-weight:800;white-space:nowrap}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--warning);box-shadow:0 0 0 4px rgba(216,139,46,.13)}
+    .dot.good{background:var(--positive);box-shadow:0 0 0 4px rgba(20,158,118,.15)}
+    .dot.bad{background:var(--negative);box-shadow:0 0 0 4px rgba(224,77,99,.12)}
+    .themebtn{display:grid;place-items:center;min-width:43px;height:43px;border:1px solid var(--border);border-radius:14px;color:var(--ink);background:var(--surface-strong);font-size:19px}
+    .hero{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:center;gap:24px;padding:32px 35px;margin-bottom:19px;background:linear-gradient(116deg,#252b72 0%,#4a4bbb 53%,#516dd8 100%);border-radius:26px;color:white;box-shadow:0 22px 45px rgba(54,66,161,.2)}
+    .hero:before{content:"";width:270px;height:270px;position:absolute;right:-60px;top:-90px;border:48px solid rgba(255,255,255,.08);border-radius:50%}
+    .hero:after{content:"";position:absolute;width:200px;height:200px;right:135px;bottom:-160px;border-radius:50%;background:rgba(255,255,255,.08)}
+    .hero>*{position:relative;z-index:1}.eyebrow{font-size:11px;letter-spacing:2.3px;text-transform:uppercase;font-weight:800;opacity:.78}
+    h1{font-size:clamp(28px,4.5vw,40px);letter-spacing:-1.7px;line-height:1.1;margin:10px 0}
+    .hero p{margin:0;opacity:.82;font-size:14px;line-height:1.65;max-width:510px}
+    .hero-state{display:flex;flex-direction:column;align-items:flex-end;gap:11px;min-width:178px}
+    .hero-state .badge{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.13);color:white;backdrop-filter:blur(15px)}
+    .hero-state .dot{box-shadow:none}.hero-state small{opacity:.8;font-size:11px;text-align:right}
+    .layout{display:grid;grid-template-columns:1.05fr .95fr;gap:19px}
+    .stack{display:grid;gap:19px;align-content:start}
+    .card{padding:26px 28px}
+    .section-title{font-size:16px;font-weight:850;letter-spacing:-.3px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .muted{font-size:12px;color:var(--sub);line-height:1.55}
+    .section-sub{margin:6px 0 0}.chip{font-size:11px;font-weight:850;color:var(--accent);background:rgba(122,104,237,.1);padding:7px 10px;border-radius:10px;white-space:nowrap}
+    .fill-center{display:flex;align-items:center;justify-content:center;gap:45px;padding:20px 0 3px;flex-wrap:wrap}
+    .ring{height:224px;width:224px;position:relative;flex-shrink:0;display:grid;place-items:center}
+    .ring svg{position:absolute;inset:0;transform:rotate(-90deg);width:100%;height:100%}
+    .ring circle{fill:none;stroke-width:14}
+    .ring .ring-bg{stroke:var(--track)}
+    .ring .ring-fill{stroke:var(--positive);stroke-linecap:round;stroke-dasharray:566;stroke-dashoffset:566;transition:stroke-dashoffset .6s,stroke .4s}
+    .ring-text{text-align:center}.ring-text b{display:block;font-size:54px;font-weight:850;letter-spacing:-3px}
+    .ring-text b span{font-size:24px;letter-spacing:0;color:var(--sub)}.ring-text small{font-size:12px;color:var(--sub);font-weight:700}
+    .fill-meta{min-width:150px;flex:1;max-width:190px}.fill-meta strong{font-size:23px;display:block;margin:11px 0 3px}
+    .fill-meta p{line-height:1.65;margin:8px 0 14px;font-size:12px;color:var(--sub)}
+    .meter{height:9px;background:var(--track);border-radius:99px;overflow:hidden}.meter>span{display:block;height:100%;width:0%;border-radius:99px;background:var(--positive);transition:width .5s}
+    .meter-label{display:flex;justify-content:space-between;color:var(--sub);font-size:10px;font-weight:700;margin:8px 0 0}
+    .lid-state{margin:22px 0 19px;background:var(--surface-strong);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .lid-icon{height:53px;width:53px;background:rgba(114,102,239,.11);border-radius:16px;display:grid;place-items:center;font-size:28px}
+    .lid-main{display:flex;align-items:center;gap:15px}.lid-main small{display:block;color:var(--sub);font-size:12px;margin-bottom:5px}.lid-main strong{font-size:24px;letter-spacing:-.7px}
+    .mode-tag{padding:7px 11px;border-radius:99px;background:rgba(111,102,228,.12);color:var(--accent);font-size:11px;font-weight:850}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+    .act{border:none;border-radius:14px;padding:16px 12px;color:white;display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:850;transition:transform .17s,filter .17s,opacity .17s}
+    .act:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.07)}
+    .act:active:not(:disabled){transform:translateY(0)}
+    .act:disabled{opacity:.43;cursor:not-allowed;filter:grayscale(.4)}
+    .act.open{background:linear-gradient(130deg,#6573f0,#417ff5)}
+    .act.close{background:linear-gradient(130deg,#e66f83,#d34869)}
+    .act.auto{grid-column:1/-1;background:linear-gradient(110deg,#0f9d84,#26b6a1)}
+    .act.calibrate{grid-column:1/-1;background:var(--surface-strong);border:1px solid var(--border);color:var(--ink);margin-top:3px}
+    .hint{font-size:11px;color:var(--sub);line-height:1.6;margin:14px 0 0}
+    .sensor-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+    .sensor{border:1px solid var(--border);background:var(--surface-strong);border-radius:18px;padding:18px;min-height:128px}
+    .sensor .small-icon{display:inline-grid;place-items:center;background:rgba(108,108,229,.1);color:var(--accent);font-size:17px;border-radius:11px;width:34px;height:34px;margin-bottom:13px}
+    .sensor small{font-size:11px;color:var(--sub);display:block;margin-bottom:5px}.sensor strong{font-size:19px;letter-spacing:-.45px}.sensor .unit{font-size:11px;color:var(--faint);font-weight:650}
+    .details{margin-top:18px;border-top:1px solid var(--border);padding-top:15px;display:grid;gap:12px}
+    .detailrow{display:flex;align-items:center;justify-content:space-between;gap:15px;font-size:12px;color:var(--sub)}.detailrow strong{font-size:12px;color:var(--ink);font-weight:800;text-align:right;overflow-wrap:anywhere}
+    .log{display:flex;flex-direction:column;gap:0;margin-top:15px;max-height:200px;overflow:auto}
+    .log-entry{border-top:1px solid var(--border);padding:12px 0;display:flex;justify-content:space-between;gap:12px;font-size:12px}
+    .log-entry strong{font-weight:700}.log-entry time{white-space:nowrap;color:var(--faint);font-size:11px}
+    .empty-log{font-size:12px;color:var(--sub);padding:17px 0}
+    .footer{display:flex;align-items:center;justify-content:space-between;gap:15px;color:var(--sub);font-size:11px;margin:19px 5px 0;flex-wrap:wrap}
+    #toast{position:fixed;right:20px;bottom:22px;z-index:100;padding:13px 19px;border-radius:14px;background:#263264;color:white;box-shadow:0 14px 40px rgba(0,0,0,.25);font-size:13px;font-weight:700;max-width:calc(100vw - 40px);opacity:0;pointer-events:none;transform:translateY(12px);transition:.25s}
+    #toast.show{opacity:1;transform:translateY(0)}
+    @media(max-width:800px){.layout{grid-template-columns:1fr}.wrap{padding:18px 15px 30px}.hero{padding:28px 22px}.fill-center{gap:18px}}
+    @media(max-width:520px){header{align-items:flex-start}.brand strong{font-size:15px}.brand small{font-size:9px}.logo{width:41px;height:41px}.badge{padding:10px;font-size:11px}.badge .hide-small{display:none}.hero-state{display:none}.card{padding:22px 19px}.fill-center{display:grid;justify-items:center}.fill-meta{width:100%;max-width:none}.ring{width:210px;height:210px}.section-title{font-size:15px}.hero p{font-size:12px}.sensor-grid{gap:9px}.sensor{padding:14px}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v5M14 11v5"/></svg>
+        </div>
+        <div><strong>SMART DUSTBIN</strong><small>IoT Command Center</small></div>
+      </div>
+      <div class="right-header">
+        <div class="badge"><span class="dot" id="mqttDot"></span><span id="mqttLabel">Connecting...</span></div>
+        <button class="themebtn" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle theme">☾</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Live operations / ESP32</div>
+        <h1>Smarter waste.<br/>Simpler control.</h1>
+        <p>Monitor fill levels, detect hand movement and control your lid from anywhere through EMQX Cloud.</p>
+      </div>
+      <div class="hero-state">
+        <div class="badge"><span class="dot" id="deviceDot"></span><span id="deviceLabel">Device offline</span></div>
+        <small id="updatedText">Awaiting live sensor data</small>
+      </div>
+    </section>
+
+    <main class="layout">
+      <div class="stack">
+        <section class="glass card" aria-label="Waste fill level">
+          <div class="section-title"><span>Waste Fill Level</span><span class="chip" id="fillChip">Waiting for data</span></div>
+          <p class="muted section-sub">Live ultrasonic measurement from inside the dustbin</p>
+          <div class="fill-center">
+            <div class="ring">
+              <svg viewBox="0 0 224 224" aria-hidden="true"><circle class="ring-bg" cx="112" cy="112" r="90"/><circle class="ring-fill" id="ringFill" cx="112" cy="112" r="90"/></svg>
+              <div class="ring-text"><b id="fillValue">--<span>%</span></b><small>BIN CAPACITY</small></div>
+            </div>
+            <div class="fill-meta">
+              <span class="muted">Current condition</span>
+              <strong id="fillStatus">Waiting...</strong>
+              <p id="fillDescription">The dashboard will update as soon as your ESP32 publishes data.</p>
+              <div class="meter"><span id="fillBar"></span></div>
+              <div class="meter-label"><span>0% EMPTY</span><span>80% AUTO LOCK</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass card" aria-label="Ultrasonic sensor readings">
+          <div class="section-title">Sensor Readings <span class="chip">REAL TIME</span></div>
+          <p class="muted section-sub">Measurements and calibration values</p>
+          <div class="sensor-grid">
+            <div class="sensor"><span class="small-icon">▤</span><small>Inside Distance</small><strong id="inside">--</strong> <span class="unit">cm</span></div>
+            <div class="sensor"><span class="small-icon">◉</span><small>Hand Distance</small><strong id="outside">--</strong> <span class="unit">cm</span></div>
+            <div class="sensor"><span class="small-icon">↕</span><small>Empty Bin Depth</small><strong id="depth">--</strong> <span class="unit">cm</span></div>
+            <div class="sensor"><span class="small-icon">⌁</span><small>Wi-Fi Signal</small><strong id="rssi">--</strong> <span class="unit">dBm</span></div>
+          </div>
+          <div class="details">
+            <div class="detailrow"><span>Hand Detection</span><strong id="hand">--</strong></div>
+            <div class="detailrow"><span>Automatic Safety Lock</span><strong id="lock">--</strong></div>
+            <div class="detailrow"><span>ESP32 Sensor Health</span><strong id="sensorHealth">--</strong></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="glass card" aria-label="Remote lid control">
+          <div class="section-title">Lid Controls <span class="chip">REMOTE MQTT</span></div>
+          <p class="muted section-sub">Manual override or automatic hand detection</p>
+          <div class="lid-state">
+            <div class="lid-main"><div class="lid-icon">♧</div><div><small>Current Lid Position</small><strong id="lidStatus">--</strong></div></div>
+            <span class="mode-tag" id="modeTag">UNKNOWN</span>
+          </div>
+          <div class="controls">
+            <button class="act open" data-cmd="OPEN" disabled>↑ &nbsp; OPEN 60°</button>
+            <button class="act close" data-cmd="CLOSE" disabled>↓ &nbsp; CLOSE 0°</button>
+            <button class="act auto" data-cmd="AUTO" disabled>◉ &nbsp; ENABLE AUTO MODE</button>
+            <button class="act calibrate" data-cmd="CALIBRATE" disabled>↻ &nbsp; CALIBRATE EMPTY BIN</button>
+          </div>
+          <p class="hint" id="controlHint">Commands become available when EMQX and the ESP32 are online. Manual controls override the automatic mode, including when the bin is full.</p>
+        </section>
+
+        <section class="glass card" aria-label="Connection information">
+          <div class="section-title">Connection Information <span class="chip">EMQX CLOUD</span></div>
+          <div class="details" style="border:none;margin-top:12px;padding-top:0">
+            <div class="detailrow"><span>MQTT Broker</span><strong id="brokerInfo">--</strong></div>
+            <div class="detailrow"><span>Transport</span><strong>Secure WebSocket / 8084</strong></div>
+            <div class="detailrow"><span>Cloud Connection</span><strong id="connectionInfo">Connecting</strong></div>
+            <div class="detailrow"><span>ESP32 Status</span><strong id="espInfo">Offline</strong></div>
+            <div class="detailrow"><span>Last Received</span><strong id="lastReceived">Never</strong></div>
+          </div>
+        </section>
+        <section class="glass card" aria-label="Recent activity">
+          <div class="section-title">Recent Activity <span class="chip">EVENT LOG</span></div>
+          <div id="log" class="log"><div class="empty-log">Waiting for MQTT connection...</div></div>
+        </section>
+      </div>
+    </main>
+    <div class="footer"><span>SMART DUSTBIN · ESP32 + EMQX Cloud</span><span>Connected controls require an active internet connection</span></div>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Loads one dependency. The rest of the dashboard is fully in this file. -->
+  <script src="https://unpkg.com/mqtt@5.16.1/dist/mqtt.min.js"></script>
+  <script>
+    'use strict';
+    // WARNING: Browser source code is PUBLIC to anyone who opens this page.
+    // These credentials are for a PRIVATE BENCH PROTOTYPE ONLY.
+    // DO NOT host this page publicly with an MQTT password inside it.
+    const CFG = Object.freeze({
+      host: 'na45ffa4.ala.asia-southeast1.emqxsl.com',
+      port: 8084,
+      username: 'loadindus',
+      password: '12345678',
+      topicPrefix: 'loadindusa/dustbin'
+    });
+    const TOPICS = {
+      cmd: CFG.topicPrefix + '/cmd',
+      status: CFG.topicPrefix + '/status',
+      availability: CFG.topicPrefix + '/availability',
+      ack: CFG.topicPrefix + '/ack'
+    };
+    const $ = id => document.getElementById(id);
+    let client = null, mqttOnline = false, deviceOnline = false, lastState = null, toastTimer = null, lastReceiveTs = 0;
+    const CIRCUMFERENCE = 2 * Math.PI * 90;
+    const commands = Array.from(document.querySelectorAll('[data-cmd]'));
+
+    // First load follows system light/dark setting; subsequent loads remember choice.
+    let storedTheme = null;
+    try { storedTheme = localStorage.getItem('dustbin-theme'); } catch (_) {}
+    const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    function setTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      $('themeBtn').textContent = theme === 'dark' ? '☀' : '☾';
+      $('themeBtn').setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    }
+    setTheme(storedTheme === 'dark' || storedTheme === 'light' ? storedTheme : (systemDark ? 'dark' : 'light'));
+    $('themeBtn').addEventListener('click', () => {
+      const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      setTheme(theme);
+      try { localStorage.setItem('dustbin-theme', theme); } catch (_) {}
+    });
+
+    function toast(message) {
+      $('toast').textContent = message;
+      $('toast').classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => $('toast').classList.remove('show'), 3000);
+    }
+    function addLog(message) {
+      const list = $('log');
+      if (list.querySelector('.empty-log')) list.textContent = '';
+      const entry = document.createElement('div'); entry.className = 'log-entry';
+      const title = document.createElement('strong'); title.textContent = message;
+      const time = document.createElement('time'); time.textContent = new Date().toLocaleTimeString();
+      entry.append(title, time); list.prepend(entry);
+      while (list.children.length > 8) list.lastChild.remove();
+    }
+    function updateConnection() {
+      $('mqttDot').className = 'dot ' + (mqttOnline ? 'good' : 'bad');
+      $('mqttLabel').textContent = mqttOnline ? 'Cloud connected' : 'Cloud offline';
+      $('deviceDot').className = 'dot ' + (deviceOnline ? 'good' : 'bad');
+      $('deviceLabel').textContent = deviceOnline ? 'ESP32 ONLINE' : 'ESP32 OFFLINE';
+      $('connectionInfo').textContent = mqttOnline ? 'Connected' : 'Disconnected';
+      $('espInfo').textContent = deviceOnline ? 'Online' : 'Offline';
+      $('controlHint').textContent = mqttOnline && deviceOnline
+        ? 'Remote controls ready. OPEN/CLOSE enter manual mode; AUTO restores hand detection. Calibrate ONLY when the bin is completely empty.'
+        : 'Controls are disabled until both EMQX and the ESP32 are online.';
+      commands.forEach(btn => btn.disabled = !(mqttOnline && deviceOnline));
+    }
+    function safeNumber(x) { return typeof x === 'number' && Number.isFinite(x); }
+    function setData(id, value) { $(id).textContent = value; }
+    function showState(d) {
+      if (typeof d !== 'object' || d === null) return;
+      lastState = d;
+      lastReceiveTs = Date.now();
+      $('updatedText').textContent = 'Latest update just received';
+      $('lastReceived').textContent = new Date().toLocaleTimeString();
+      const valid = d.insideValid === true && safeNumber(d.fill);
+      const fill = valid ? Math.max(0, Math.min(100, d.fill)) : 0;
+      const fillColor = !valid || d.full === true ? 'var(--negative)' : fill >= 60 ? 'var(--warning)' : 'var(--positive)';
+      $('fillValue').innerHTML = valid ? `${Math.round(fill)}<span>%</span>` : '--<span>%</span>';
+      $('ringFill').style.strokeDasharray = String(CIRCUMFERENCE);
+      $('ringFill').style.strokeDashoffset = String(CIRCUMFERENCE * (1 - fill / 100));
+      $('ringFill').style.stroke = fillColor;
+      $('fillBar').style.width = fill + '%';
+      $('fillBar').style.background = fillColor;
+      const state = !valid ? 'Sensor error' : d.full ? 'Bin full' : fill >= 60 ? 'Filling up' : 'Normal';
+      setData('fillStatus', state);
+      setData('fillChip', !valid ? 'SENSOR ERROR' : d.full ? 'AUTO LOCKED' : 'LIVE STATUS');
+      setData('fillDescription', !valid ? 'Inside sensor reading unavailable. Check wiring.' : d.full ? 'Reached the 80% threshold. Automatic opening is disabled.' : 'Capacity is below the 80% automatic lock threshold.');
+      setData('lidStatus', d.lidOpen ? 'OPEN 60°' : 'CLOSED 0°');
+      setData('modeTag', d.manual ? 'MANUAL MODE' : 'AUTO MODE');
+      setData('inside', d.insideValid && safeNumber(d.inside) ? d.inside.toFixed(1) : 'ERR');
+      setData('outside', d.outsideValid && safeNumber(d.outside) ? d.outside.toFixed(1) : 'ERR');
+      setData('depth', safeNumber(d.depth) ? d.depth.toFixed(1) : '--');
+      setData('rssi', safeNumber(d.wifiRssi) ? String(d.wifiRssi) : '--');
+      setData('hand', d.outsideValid ? (d.hand ? 'Detected' : 'Not detected') : 'Sensor error');
+      setData('lock', d.locked ? 'LOCKED' : 'UNLOCKED');
+      setData('sensorHealth', d.insideValid && d.outsideValid ? 'Both sensors working' : 'Check sensor readings');
+    }
+
+    function sendCommand(command) {
+      if (!mqttOnline || !deviceOnline || !client || !client.connected) { toast('ESP32 or MQTT is offline'); return; }
+      if (command === 'CALIBRATE' && !confirm('Is the dustbin COMPLETELY EMPTY? This will save the current inside sensor distance to ESP32 flash.')) return;
+      client.publish(TOPICS.cmd, command, {qos:1, retain:false}, err => {
+        if (err) { toast('Publish failed: ' + err.message); addLog('Command failed: ' + command); return; }
+        addLog('Sent command: ' + command);
+        toast('Sent ' + command + ' · awaiting ESP32 acknowledgement');
+      });
+    }
+    commands.forEach(btn => btn.addEventListener('click', () => sendCommand(btn.dataset.cmd)));
+
+    function connectMQTT() {
+      if (typeof mqtt === 'undefined' || !mqtt.connect) {
+        $('mqttLabel').textContent = 'MQTT.js unavailable';
+        toast('MQTT library could not load. Check internet access.');
+        addLog('MQTT.js CDN was blocked or unavailable');
+        return;
+      }
+      const url = `wss://${CFG.host}:${CFG.port}/mqtt`;
+      // A random client ID prevents tab/browser sessions from kicking each other off.
+      // EMQX authorization must therefore grant the USERNAME access to the topic.
+      const clientId = 'loadweb-' + Math.random().toString(16).slice(2, 10);
+      client = mqtt.connect(url, {
+        clientId,
+        username: CFG.username,
+        password: CFG.password,
+        protocolVersion: 4,
+        clean: true,
+        keepalive: 30,
+        connectTimeout: 12000,
+        reconnectPeriod: 3500,
+        resubscribe: true
+      });
+      client.on('connect', () => {
+        mqttOnline = true;
+        updateConnection();
+        addLog('Connected securely to EMQX');
+        client.subscribe([TOPICS.status, TOPICS.availability, TOPICS.ack], {qos:0}, (err, granted) => {
+          const denied = Array.isArray(granted) && granted.some(g => g.qos === 128);
+          if (err || denied) { toast('Subscription denied - check EMQX authorization'); addLog('MQTT subscription denied - check Username ACL'); }
+          else addLog('Subscribed to device topics');
+        });
+      });
+      client.on('message', (topic, payload) => {
+        const msg = payload.toString();
+        if (topic === TOPICS.availability) {
+          const before = deviceOnline;
+          deviceOnline = msg.trim().toLowerCase() === 'online';
+          updateConnection();
+          if (before !== deviceOnline) addLog(deviceOnline ? 'ESP32 connected' : 'ESP32 disconnected');
+        } else if (topic === TOPICS.status) {
+          try { showState(JSON.parse(msg)); }
+          catch (_) { addLog('Invalid JSON status received'); }
+        } else if (topic === TOPICS.ack) {
+          addLog('ESP32 acknowledgement: ' + msg);
+          toast('ESP32: ' + msg);
+        }
+      });
+      client.on('reconnect', () => { mqttOnline = false; deviceOnline = false; updateConnection(); });
+      client.on('offline', () => { mqttOnline = false; deviceOnline = false; updateConnection(); });
+      client.on('close', () => { mqttOnline = false; deviceOnline = false; updateConnection(); });
+      client.on('error', err => {
+        mqttOnline = false; deviceOnline = false; updateConnection();
+        console.error('EMQX MQTT connection error:', err);
+      });
+    }
+
+    $('brokerInfo').textContent = CFG.host;
+    $('ringFill').style.strokeDasharray = String(CIRCUMFERENCE);
+    $('ringFill').style.strokeDashoffset = String(CIRCUMFERENCE);
+    updateConnection();
+    addLog('Automatic MQTT connection starting...');
+    connectMQTT(); // ON PAGE OPEN: no manual connect button is required.
+    setInterval(() => {
+      if (lastReceiveTs) {
+        const age = Math.floor((Date.now() - lastReceiveTs) / 1000);
+        $('updatedText').textContent = 'Last telemetry ' + age + 's ago';
+        // A retained 'online' value alone is not enough if telemetry has stopped.
+        if (age > 12 && deviceOnline) { deviceOnline = false; updateConnection(); addLog('Telemetry stale - controls disabled'); }
+      }
+    }, 1500);
+  </script>
+</body>
+</html>
